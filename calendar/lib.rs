@@ -3,8 +3,8 @@
 #[ink::contract]
 mod calendar {
     use ink::prelude::vec::Vec;
-    use ink::prelude::collections::BTreeMap;
     use ink::storage::Mapping;
+    use ink::storage::traits::StorageLayout;
 
     #[ink(storage)]
     pub struct Calendar {
@@ -33,8 +33,8 @@ mod calendar {
         is_available: bool,
     }
 
-    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode, Clone)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
     pub enum Error {
         WorkerNotRegistered,
         NotAuthorized,
@@ -63,7 +63,7 @@ mod calendar {
 
             if !self.registered_workers.contains(&worker) {
                 self.registered_workers.push(worker);
-                self.worker_availability.insert(worker, &Vec::new());
+                self.worker_availability.insert(worker, &Vec::<AccountId>::new());
                 
                 self.env().emit_event(WorkerRegistered { worker });
             }
@@ -139,7 +139,7 @@ mod calendar {
             for worker in workers {
                 if !self.registered_workers.contains(&worker) {
                     self.registered_workers.push(worker);
-                    self.worker_availability.insert(worker, &Vec::new());
+                    self.worker_availability.insert(worker, &Vec::<AccountId>::new());
                     
                     self.env().emit_event(WorkerRegistered { worker });
                 }
