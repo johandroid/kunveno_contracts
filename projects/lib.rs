@@ -6,7 +6,7 @@ mod projects {
     use ink::env::call::{build_call, ExecutionInput, Selector};
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
-    
+
     #[cfg(feature = "std")]
     use ink::storage::traits::StorageLayout;
 
@@ -164,7 +164,7 @@ mod projects {
         InvalidProjectState,
 
         ConversionType,
-        ArithmeticFailure
+        ArithmeticFailure,
     }
 
     pub type Result<T> = core::result::Result<T, Error>;
@@ -299,7 +299,10 @@ mod projects {
             let mut remaining_payment = 0;
             if let Some(_scope) = &self.scope {
                 // Calculate the remaining payment
-                remaining_payment = self.total_cost.checked_sub(self.paid_amount).ok_or(Error::ArithmeticFailure)?;
+                remaining_payment = self
+                    .total_cost
+                    .checked_sub(self.paid_amount)
+                    .ok_or(Error::ArithmeticFailure)?;
 
                 // In a real implementation, this would trigger the remaining payment
                 // to be transferred from client to coordinator/team
@@ -477,7 +480,10 @@ mod projects {
                 })
                 .collect();
 
-            let tasks_count = tasks_vec.len().try_into().map_err(|_| Error::ConversionType)?;
+            let tasks_count = tasks_vec
+                .len()
+                .try_into()
+                .map_err(|_| Error::ConversionType)?;
 
             // Create scope
             let project_scope = ProjectScope {
