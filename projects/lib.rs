@@ -1,10 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+#![allow(clippy::cast_possible_truncation)]
 
 #[ink::contract]
 mod projects {
     use ink::env::call::{build_call, ExecutionInput, Selector};
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    
+    #[cfg(feature = "std")]
     use ink::storage::traits::StorageLayout;
 
     #[derive(Debug, scale::Encode, scale::Decode, PartialEq, Clone)]
@@ -17,7 +20,6 @@ mod projects {
 
     #[derive(Debug, scale::Encode, scale::Decode, PartialEq, Clone, Copy)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, StorageLayout))]
-    #[allow(clippy::cast_possible_truncation)]
     pub enum TaskComplexity {
         Abstract(u8),
         Days(u8),
