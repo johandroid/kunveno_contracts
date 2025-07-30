@@ -2,7 +2,6 @@
 
 #[ink::contract]
 mod projects {
-    use ink::codegen::Env;
     use ink::env::call::{build_call, ExecutionInput, Selector};
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
@@ -11,7 +10,7 @@ mod projects {
     #[derive(Debug, scale::Encode, scale::Decode, PartialEq, Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct TeamMember {
-        account_id: AccountId,
+        account_id: ink::H160,
         role: String,
         rating: Option<u8>,
     }
@@ -57,21 +56,21 @@ mod projects {
     #[ink::trait_definition]
     pub trait Calendar {
         #[ink(message)]
-        fn is_available(&self, account_id: AccountId, project_id: AccountId) -> bool;
+        fn is_available(&self, account_id: ink::H160, project_id: ink::H160) -> bool;
 
         #[ink(message)]
-        fn get_available_workers(&self, project_id: AccountId) -> Vec<AccountId>;
+        fn get_available_workers(&self, project_id: ink::H160) -> Vec<ink::H160>;
     }
 
     #[ink(storage)]
     pub struct Project {
         name: String,
-        client: AccountId,
-        dao_address: AccountId,
-        coordinator: Option<AccountId>,
+        client: ink::H160,
+        dao_address: ink::H160,
+        coordinator: Option<ink::H160>,
         team_members: Vec<TeamMember>,
         status: ProjectStatus,
-        calendar_contract: Option<AccountId>,
+        calendar_contract: Option<ink::H160>,
         scope: Option<ProjectScope>,
         total_cost: Balance,
         paid_amount: Balance,
@@ -82,7 +81,7 @@ mod projects {
         #[ink(topic)]
         project: String,
         #[ink(topic)]
-        coordinator: AccountId,
+        coordinator: ink::H160,
     }
 
     #[ink(event)]
@@ -97,16 +96,16 @@ mod projects {
         #[ink(topic)]
         project: String,
         #[ink(topic)]
-        client: AccountId,
+        client: ink::H160,
         final_payment: Balance,
     }
 
     #[ink(event)]
     pub struct ScopeDefined {
         #[ink(topic)]
-        project: AccountId,
+        project: ink::H160,
         #[ink(topic)]
-        coordinator: AccountId,
+        coordinator: ink::H160,
         tasks_count: u8,
         total_cost: Balance,
     }
@@ -114,18 +113,18 @@ mod projects {
     #[ink(event)]
     pub struct ScopeAccepted {
         #[ink(topic)]
-        project: AccountId,
+        project: ink::H160,
         #[ink(topic)]
-        client: AccountId,
+        client: ink::H160,
         advance_payment: Balance,
     }
 
     #[ink(event)]
     pub struct TaskCompleted {
         #[ink(topic)]
-        project: AccountId,
+        project: ink::H160,
         #[ink(topic)]
-        client: AccountId,
+        client: ink::H160,
         task_id: u8,
     }
 
@@ -168,15 +167,14 @@ mod projects {
         #[ink(constructor)]
         pub fn new(
             name: String,
-            dao_address: AccountId,
-            calendar_contract: Option<AccountId>,
+            dao_address: ink::H160,
+            calendar_contract: Option<ink::H160>,
         ) -> Self {
-            const MAX_NAME_LENGTH: u32 = 50;
 
-            // Check name length and panic if too long
-            if name.len() > MAX_NAME_LENGTH as usize {
-                panic!("Project name is too long");
-            }
+            // // Check name length and panic if too long
+            // if name.len() > MAX_NAME_LENGTH as usize {
+            //     panic!("Project name is too long");
+            // }
 
             Self {
                 name,
@@ -193,7 +191,7 @@ mod projects {
         }
 
         #[ink(message)]
-        pub fn assign_coordinator(&mut self) -> Result<AccountId> {
+        pub fn assign_coordinator(&mut self) -> Result<ink::H160> {
             let caller = self.env().caller();
             if caller != self.dao_address {
                 return Err(Error::NotAuthorized);
@@ -238,7 +236,7 @@ mod projects {
         }
 
         #[ink(message)]
-        pub fn mark_completed(&mut self, ratings: Vec<(AccountId, u8)>) -> Result<()> {
+        pub fn mark_completed(&mut self, ratings: Vec<(ink::H160, u8)>) -> Result<()> {
             let caller = self.env().caller();
 
             if caller != self.client {
@@ -311,7 +309,7 @@ mod projects {
         }
 
         #[ink(message)]
-        pub fn get_project_info(&self) -> (String, AccountId, AccountId, Option<AccountId>, ProjectStatus, Balance, Balance) {
+        pub fn get_project_info(&self) -> (String, ink::H160, ink::H160, Option<ink::H160>, ProjectStatus, Balance, Balance) {
             (
                 self.name.clone(),
                 self.client,
@@ -370,7 +368,7 @@ mod projects {
         }
 
         #[ink(message)]
-        pub fn set_calendar_contract(&mut self, calendar_contract: AccountId) -> Result<()> {
+        pub fn set_calendar_contract(&mut self, calendar_contract: ink::H160) -> Result<()> {
             let caller = self.env().caller();
             if caller != self.client {
                 return Err(Error::NotAuthorized);
@@ -478,7 +476,7 @@ mod projects {
             
             // Emit event
             self.env().emit_event(ScopeDefined {
-                project: self.env().account_id(),
+                project: self.env().address(),
                 coordinator: caller,
                 tasks_count,
                 total_cost,
@@ -520,7 +518,7 @@ mod projects {
             
             // Emit event
             self.env().emit_event(ScopeAccepted {
-                project: self.env().account_id(),
+                project: self.env().address(),
                 client: caller,
                 advance_payment,
             });
@@ -594,7 +592,7 @@ mod projects {
             
             // Emit event
             self.env().emit_event(TaskCompleted {
-                project: self.env().account_id(),
+                project: self.env().address(),
                 client: caller,
                 task_id,
             });
@@ -605,7 +603,7 @@ mod projects {
 
     // Private implementation for internal methods
     impl Project {
-        fn select_coordinator(&self) -> Result<AccountId> {
+        fn select_coordinator(&self) -> Result<ink::H160> {
             #[cfg(test)]
             {
                 // In tests, return the charlie account as coordinator
@@ -615,22 +613,25 @@ mod projects {
             #[cfg(not(test))]
             {
                 // Get calendar contract
+
+                use ink::U256;
                 let calendar_contract = match self.calendar_contract {
                     Some(address) => address,
                     None => return Err(Error::CalendarContractNotSet),
                 };
+
                 
                 // Get available coordinators from calendar contract
                 let available_workers = build_call::<ink::env::DefaultEnvironment>()
                     .call(calendar_contract)
-                    .transferred_value(0)
+                    .transferred_value(U256::from(0u128))
                     .exec_input(
                         ExecutionInput::new(Selector::new(ink::selector_bytes!(
                             "get_available_workers"
                         )))
                         .push_arg(true), // is_coordinator = true
                     )
-                    .returns::<Vec<AccountId>>()
+                    .returns::<Vec<ink::H160>>()
                     .invoke();
 
                 // Select the first available worker as coordinator
@@ -678,6 +679,7 @@ mod projects {
 
             #[cfg(not(test))]
             {
+                use ink::U256;
                 // Get calendar contract
                 let calendar_contract = match self.calendar_contract {
                     Some(address) => address,
@@ -687,12 +689,12 @@ mod projects {
                 // Get available workers from calendar contract
                 let available_workers = build_call::<ink::env::DefaultEnvironment>()
                     .call(calendar_contract)
-                    .transferred_value(0)
+                    .transferred_value(U256::from(0u128))
                     .exec_input(
                         ExecutionInput::new(Selector::new(ink::selector_bytes!("get_available_workers")))
                             .push_arg(false), // is_coordinator = false
                     )
-                    .returns::<Vec<AccountId>>()
+                    .returns::<Vec<ink::H160>>()
                     .invoke();
 
                 if available_workers.is_empty() {
